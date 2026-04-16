@@ -1,0 +1,15 @@
+name: VoidEvent
+version: '${project.version}'
+main: com.endevent.VoidEventPlugin
+api-version: '1.21.11'
+description: Evento del Vacío - Batalla épica en el End
+authors: [EndEvent Team]
+commands:
+  voidevent:
+    description: Controla el evento del Vacío
+    usage: /voidevent <start|stop|reset>
+    permission: voidevent.admin
+permissions:
+  voidevent.admin:
+    description: Permite controlar el evento del Vacío
+    default: op
