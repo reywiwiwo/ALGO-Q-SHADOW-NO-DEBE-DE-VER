@@ -22,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Maneja la habilidad "Impulso Ascendente" de las Alas de la Luz.
- * Doble salto en el suelo → impulso vertical + inicio de planeo.
+ * Doble salto en el suelo → impulso tipo carga de viento + inicio de planeo.
  */
 public class ElytraAbilityListener implements Listener {
 
@@ -49,7 +49,6 @@ public class ElytraAbilityListener implements Listener {
         if (p.getGameMode() == GameMode.CREATIVE || p.getGameMode() == GameMode.SPECTATOR) return;
         if (!hasSpecialElytra(p)) return;
 
-        // Cuando el jugador está en el suelo, permitir "vuelo" para detectar doble salto
         if (p.isOnGround() && !p.isFlying()) {
             p.setAllowFlight(true);
         }
@@ -60,40 +59,89 @@ public class ElytraAbilityListener implements Listener {
         Player p = e.getPlayer();
         if (p.getGameMode() == GameMode.CREATIVE || p.getGameMode() == GameMode.SPECTATOR) return;
         if (!hasSpecialElytra(p)) return;
-        if (!p.isOnGround()) return;
-        if (cooldown.contains(p.getUniqueId())) return;
 
-        // Cancelar el vuelo vanilla
+        // SIEMPRE cancelar el vuelo — nunca dejar volar
         e.setCancelled(true);
         p.setAllowFlight(false);
         p.setFlying(false);
 
-        // Cooldown de 3 segundos
+        // Solo impulsar desde el suelo
+        if (!p.isOnGround()) return;
+        if (cooldown.contains(p.getUniqueId())) return;
+
+        // Cooldown de 4 segundos
         cooldown.add(p.getUniqueId());
         new BukkitRunnable() {
+            public void run() { cooldown.remove(p.getUniqueId()); }
+        }.runTaskLater(plugin, 80L);
+
+        final Location origin = p.getLocation().clone();
+        final World world = p.getWorld();
+
+        // ── Impulso potente hacia arriba ──
+        p.setVelocity(new Vector(0, 1.8, 0));
+
+        // ── Sonidos: explosión de viento ──
+        world.playSound(origin, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.5f, 0.8f);
+        world.playSound(origin, Sound.ENTITY_GENERIC_EXPLODE, 0.5f, 1.8f);
+        world.playSound(origin, Sound.ITEM_TRIDENT_THROW, 0.8f, 0.5f);
+
+        // ── Explosión inicial de partículas (nube + onda) ──
+        world.spawnParticle(Particle.CLOUD, origin.clone().add(0, 0.5, 0), 50, 0.6, 0.2, 0.6, 0.15);
+        world.spawnParticle(Particle.EXPLOSION, origin.clone().add(0, 0.3, 0), 3, 0.3, 0.1, 0.3, 0);
+        world.spawnParticle(Particle.END_ROD, origin.clone().add(0, 0.5, 0), 30, 0.4, 0.2, 0.4, 0.1);
+
+        // ── Anillo expansivo en el suelo (tipo onda de choque) ──
+        new BukkitRunnable() {
+            double radius = 0.5;
+            @Override
             public void run() {
-                cooldown.remove(p.getUniqueId());
+                if (radius > 5.0) { cancel(); return; }
+                int points = (int)(radius * 12);
+                for (int i = 0; i < points; i++) {
+                    double angle = (2 * Math.PI / points) * i;
+                    double x = origin.getX() + radius * Math.cos(angle);
+                    double z = origin.getZ() + radius * Math.sin(angle);
+                    Location point = new Location(world, x, origin.getY() + 0.1, z);
+                    Particle.DustOptions dust = new Particle.DustOptions(
+                            Color.fromRGB(200, 230, 255), 1.5f);
+                    world.spawnParticle(Particle.DUST, point, 1, 0, 0, 0, 0, dust);
+                    if (i % 3 == 0) {
+                        world.spawnParticle(Particle.CLOUD, point, 1, 0.1, 0.05, 0.1, 0.01);
+                    }
+                }
+                radius += 0.8;
             }
-        }.runTaskLater(plugin, 60L);
+        }.runTaskTimer(plugin, 0L, 1L);
 
-        // Impulso hacia arriba
-        p.setVelocity(new Vector(0, 1.5, 0));
+        // ── Estela de partículas mientras sube ──
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override
+            public void run() {
+                if (!p.isOnline() || ticks > 15) { cancel(); return; }
+                Location loc = p.getLocation();
+                world.spawnParticle(Particle.CLOUD, loc, 8, 0.3, 0.1, 0.3, 0.05);
+                world.spawnParticle(Particle.END_ROD, loc, 5, 0.2, 0.3, 0.2, 0.02);
+                Particle.DustOptions trail = new Particle.DustOptions(
+                        Color.fromRGB(255, 215, 0), 1.2f);
+                world.spawnParticle(Particle.DUST, loc, 4, 0.2, 0.1, 0.2, 0, trail);
+                ticks++;
+            }
+        }.runTaskTimer(plugin, 2L, 1L);
 
-        // Efectos visuales y sonido
-        p.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0f, 1.5f);
-        p.getWorld().spawnParticle(Particle.END_ROD, p.getLocation().add(0, 0.5, 0), 40, 0.5, 0.3, 0.5, 0.08);
-
-        // Mensaje en la ActionBar
+        // ActionBar
         p.sendActionBar(Component.text("✦ Impulso Ascendente ✦", NamedTextColor.GOLD)
                 .decorate(TextDecoration.BOLD));
 
-        // Activar planeo tras un breve momento (cuando ya está en el aire)
+        // Activar planeo cuando alcanza altura
         new BukkitRunnable() {
             public void run() {
                 if (p.isOnline() && !p.isOnGround()) {
                     p.setGliding(true);
+                    world.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 0.8f, 1.5f);
                 }
             }
-        }.runTaskLater(plugin, 8L);
+        }.runTaskLater(plugin, 10L);
     }
 }

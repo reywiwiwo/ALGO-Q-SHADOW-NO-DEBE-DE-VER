@@ -1005,60 +1005,54 @@ public class EventManager {
         long delay = 120L;
 
         // ── Acto I: Introspección ──
-        delay = poemTitle(players, delay,
-                "Veo al jugador al que te refieres.", "",
+        delay = poemTitle(players, delay, "",
+                "Veo al jugador al que te refieres.",
                 NamedTextColor.GRAY, NamedTextColor.GRAY, 3500);
-        delay = poemTitle(players, delay,
-                "A veces soñaba que era otras cosas,", "en otros lugares.",
+        delay = poemTitle(players, delay, "",
+                "A veces soñaba que era otras cosas, en otros lugares.",
                 NamedTextColor.GRAY, NamedTextColor.GRAY, 3500);
-        delay = poemTitle(players, delay,
-                "A veces creía que el universo le hablaba", "a través de los unos y ceros.",
-                NamedTextColor.GRAY, NamedTextColor.WHITE, 3500);
-        delay = poemTitle(players, delay,
-                "A través de las palabras en una pantalla,", "al final de un sueño.",
+        delay = poemTitle(players, delay, "",
+                "A veces creía que el universo le hablaba a través de los unos y ceros.",
                 NamedTextColor.GRAY, NamedTextColor.WHITE, 4000);
-        delay = poemTitle(players, delay,
-                "Y el jugador era una historia nueva,", "nunca antes contada, escrita en letras de ADN.",
-                NamedTextColor.WHITE, NamedTextColor.GRAY, 4000);
-        delay = poemTitle(players, delay,
-                "Y el jugador estaba vivo.", "",
+        delay = poemTitle(players, delay, "",
+                "A través de las palabras en una pantalla, al final de un sueño.",
+                NamedTextColor.GRAY, NamedTextColor.WHITE, 4000);
+        delay = poemTitle(players, delay, "",
+                "Y el jugador estaba vivo.",
                 NamedTextColor.WHITE, NamedTextColor.WHITE, 3000);
 
         // ── Acto II: El universo habla ──
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "te quiero.",
+        delay = poemTitle(players, delay, "Y el universo dijo",
+                "te quiero.",
                 NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 3000);
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "has jugado bien el juego.",
+        delay = poemTitle(players, delay, "Y el universo dijo",
+                "has jugado bien el juego.",
                 NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 3000);
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "todo lo que necesitas está dentro de ti.",
+        delay = poemTitle(players, delay, "Y el universo dijo",
+                "todo lo que necesitas está dentro de ti.",
                 NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 3500);
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "eres más fuerte de lo que crees.",
+        delay = poemTitle(players, delay, "Y el universo dijo",
+                "eres más fuerte de lo que crees.",
                 NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 3000);
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "eres la luz del día.",
+        delay = poemTitle(players, delay, "Y el universo dijo",
+                "eres la luz del día.",
                 NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 3000);
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "no estás solo.",
+        delay = poemTitle(players, delay, "Y el universo dijo",
+                "no estás solo.",
                 NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 3500);
-        delay = poemTitle(players, delay,
-                "Y el universo dijo", "todo lo que alguna vez necesitarás, ya lo tienes.",
-                NamedTextColor.DARK_PURPLE, NamedTextColor.LIGHT_PURPLE, 4000);
 
         // ── Acto III: Despertar ──
-        delay = poemTitle(players, delay,
-                "Y el juego terminó", "y el jugador despertó del sueño.",
+        delay = poemTitle(players, delay, "",
+                "Y el juego terminó y el jugador despertó del sueño.",
                 NamedTextColor.WHITE, NamedTextColor.GRAY, 4000);
-        delay = poemTitle(players, delay,
-                "Y el jugador comenzó un nuevo sueño.", "Y soñó de nuevo. Soñó mejor.",
+        delay = poemTitle(players, delay, "",
+                "Y soñó de nuevo. Soñó mejor.",
                 NamedTextColor.WHITE, NamedTextColor.GRAY, 4000);
-        delay = poemTitle(players, delay,
-                "Y el jugador era el universo.", "Y el universo era el jugador.",
-                NamedTextColor.AQUA, NamedTextColor.WHITE, 4500);
-        delay = poemTitle(players, delay,
-                "Tú eres el jugador.", "",
+        delay = poemTitle(players, delay, "",
+                "Y el jugador era el universo. Y el universo era el jugador.",
+                NamedTextColor.AQUA, NamedTextColor.AQUA, 4500);
+        delay = poemTitle(players, delay, "",
+                "Tú eres el jugador.",
                 NamedTextColor.GREEN, NamedTextColor.GREEN, 3500);
 
         // "Despierta." — cierre final
@@ -1070,9 +1064,9 @@ public class EventManager {
                         java.time.Duration.ofMillis(5000),
                         java.time.Duration.ofMillis(2000));
                 net.kyori.adventure.title.Title title = net.kyori.adventure.title.Title.title(
-                        Component.text("Despierta.", NamedTextColor.GREEN)
-                                .decorate(TextDecoration.BOLD).decorate(TextDecoration.ITALIC),
                         Component.empty(),
+                        Component.text("Despierta.", NamedTextColor.GREEN)
+                                .decorate(TextDecoration.ITALIC),
                         times);
                 for (Player p : players) {
                     if (p.isOnline()) {
@@ -1104,7 +1098,9 @@ public class EventManager {
                         java.time.Duration.ofMillis(600),
                         java.time.Duration.ofMillis(stayMs),
                         java.time.Duration.ofMillis(800));
-                Component titleComp = Component.text(top, topColor).decorate(TextDecoration.ITALIC);
+                Component titleComp = top.isEmpty()
+                        ? Component.empty()
+                        : Component.text(top, topColor).decorate(TextDecoration.ITALIC);
                 Component subtitleComp = bottom.isEmpty()
                         ? Component.empty()
                         : Component.text(bottom, bottomColor).decorate(TextDecoration.ITALIC);
@@ -1115,7 +1111,7 @@ public class EventManager {
                 }
             }
         }.runTaskLater(plugin, delay));
-        return delay + (stayMs / 50) + 28; // stay + fade in/out en ticks
+        return delay + (stayMs / 50) + 28;
     }
 
     // ======================================================================

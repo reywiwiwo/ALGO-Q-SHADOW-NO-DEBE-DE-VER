@@ -198,12 +198,19 @@ public class ArenaManager {
     }
 
     /**
-     * Regenera la isla del End (para la cinemática final)
+     * Regenera la isla del End (para la cinemática final) con animación dramática.
      */
     public void regenerateEndIsland(Location center, double radius, Runnable onComplete) {
         World world = center.getWorld();
         int cx = (int) center.getX();
         int cz = (int) center.getZ();
+
+        // Destello inicial dorado
+        org.bukkit.Particle.DustOptions goldFlash = new org.bukkit.Particle.DustOptions(
+                org.bukkit.Color.fromRGB(255, 215, 0), 3.0f);
+        world.spawnParticle(org.bukkit.Particle.DUST, center.clone().add(0, 2, 0), 100, 3, 3, 3, 0, goldFlash);
+        world.spawnParticle(org.bukkit.Particle.END_ROD, center.clone().add(0, 2, 0), 60, 2, 4, 2, 0.1);
+        world.playSound(center, org.bukkit.Sound.BLOCK_BEACON_ACTIVATE, 2.0f, 0.8f);
 
         // Pre-calcular posiciones asíncronamente
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -229,30 +236,66 @@ public class ArenaManager {
                     public void run() {
                         if (ringIndex >= rings.size()) {
                             cancel();
+                            // Efecto final: explosión de luz
+                            world.spawnParticle(org.bukkit.Particle.END_ROD, center.clone().add(0, 3, 0),
+                                    200, 5, 5, 5, 0.15);
+                            world.playSound(center, org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.5f, 1.2f);
                             if (onComplete != null) {
                                 new BukkitRunnable() { public void run() { onComplete.run(); } }
-                                        .runTaskLater(plugin, 20L);
+                                        .runTaskLater(plugin, 40L);
                             }
                             return;
                         }
 
                         List<int[]> ring = rings.get(ringIndex);
+                        double currentR = ringIndex * 2.0;
+
                         for (int[] pos : ring) {
                             int surfaceY = pos[2];
-                            for (int y = surfaceY; y >= surfaceY - 3; y--) {
+                            // Colocar bloques desde abajo hacia arriba
+                            for (int y = surfaceY - 3; y <= surfaceY; y++) {
                                 Block b = world.getBlockAt(pos[0], y, pos[1]);
                                 if (b.getType() == Material.AIR) {
                                     b.setType(Material.END_STONE);
                                 }
                             }
-                            world.spawnParticle(org.bukkit.Particle.END_ROD,
-                                    new Location(world, pos[0] + 0.5, surfaceY + 1, pos[1] + 0.5),
-                                    3, 0.3, 0.5, 0.3, 0.02);
+
+                            // Rayo de luz dorada ascendente por cada bloque colocado
+                            Location top = new Location(world, pos[0] + 0.5, surfaceY + 1, pos[1] + 0.5);
+                            if (random.nextInt(3) == 0) {
+                                world.spawnParticle(org.bukkit.Particle.END_ROD, top,
+                                        5, 0.1, 1.5, 0.1, 0.05);
+                            }
+                            // Destello dorado en la superficie
+                            org.bukkit.Particle.DustOptions gold = new org.bukkit.Particle.DustOptions(
+                                    org.bukkit.Color.fromRGB(255, 215, 0), 1.5f);
+                            world.spawnParticle(org.bukkit.Particle.DUST, top, 2, 0.2, 0.3, 0.2, 0, gold);
+                        }
+
+                        // Onda de partículas doradas en el anillo actual
+                        int wavePoints = Math.max(20, (int)(currentR * 6));
+                        for (int i = 0; i < wavePoints; i++) {
+                            double angle = (2 * Math.PI / wavePoints) * i;
+                            double wx = center.getX() + currentR * Math.cos(angle);
+                            double wz = center.getZ() + currentR * Math.sin(angle);
+                            Location wave = new Location(world, wx, center.getY() + 1.5, wz);
+                            org.bukkit.Particle.DustOptions waveDust = new org.bukkit.Particle.DustOptions(
+                                    org.bukkit.Color.fromRGB(255, 230, 150), 2.0f);
+                            world.spawnParticle(org.bukkit.Particle.DUST, wave, 1, 0, 0, 0, 0, waveDust);
+                        }
+
+                        // Sonido periódico de reconstrucción
+                        if (ringIndex % 4 == 0) {
+                            world.playSound(center, org.bukkit.Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.2f,
+                                    0.7f + (float)(ringIndex) / rings.size() * 1.0f);
+                        }
+                        if (ringIndex % 8 == 0) {
+                            world.playSound(center, org.bukkit.Sound.BLOCK_BEACON_AMBIENT, 0.6f, 1.5f);
                         }
 
                         ringIndex++;
                     }
-                }.runTaskTimer(plugin, 0L, 4L);
+                }.runTaskTimer(plugin, 20L, 3L);
             });
         });
     }
