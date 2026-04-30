@@ -33,10 +33,10 @@ public class EventManager {
     private World endWorld;
 
     // Entidades spawneadas para la cinemática
-    private final List<ArmorStand> floatingItems = new ArrayList<>();
+    private final List<ItemDisplay> floatingItems = new ArrayList<>();
     private final List<EnderCrystal> endCrystals = new ArrayList<>();
     private final List<BukkitTask> activeTasks = new ArrayList<>();
-    private ArmorStand dragonEgg;
+    private ItemDisplay dragonEgg;
     private Giant cinematicGiant;
     private EnderDragon cinematicBlueDragon;
     private EnderDragon cinematicPurpleDragon;
@@ -141,12 +141,10 @@ public class EventManager {
 
         // Spawnar el huevo del dragón en el centro
         Location eggLoc = fountainCenter.clone().add(0, 3, 0);
-        dragonEgg = endWorld.spawn(eggLoc, ArmorStand.class, stand -> {
-            stand.setVisible(false);
-            stand.setGravity(false);
-            stand.setSmall(false);
-            stand.setMarker(true);
-            stand.getEquipment().setHelmet(new ItemStack(Material.DRAGON_EGG));
+        dragonEgg = endWorld.spawn(eggLoc, ItemDisplay.class, display -> {
+            display.setItemStack(new ItemStack(Material.DRAGON_EGG));
+            display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            display.setBillboard(Display.Billboard.VERTICAL);
         });
 
         // Animar los items flotando hacia arriba con partículas
@@ -159,13 +157,13 @@ public class EventManager {
                     startOrbitAnimation();
                     return;
                 }
-                for (ArmorStand stand : floatingItems) {
+                for (ItemDisplay stand : floatingItems) {
                     Location loc = stand.getLocation();
                     loc.add(0, 0.08, 0);
                     stand.teleport(loc);
                     // Partículas al elevarse
-                    endWorld.spawnParticle(Particle.END_ROD, loc.clone().add(0, 1, 0), 1, 0.1, 0.1, 0.1, 0.01);
-                    endWorld.spawnParticle(Particle.ENCHANT, loc.clone().add(0, 1, 0), 3, 0.2, 0.3, 0.2, 0.5);
+                    endWorld.spawnParticle(Particle.END_ROD, loc, 1, 0.1, 0.1, 0.1, 0.01);
+                    endWorld.spawnParticle(Particle.ENCHANT, loc, 3, 0.2, 0.3, 0.2, 0.5);
                 }
                 // Sonido periódico
                 if (tick % 10 == 0) {
@@ -203,7 +201,7 @@ public class EventManager {
 
                 int totalItems = floatingItems.size();
                 for (int i = 0; i < totalItems; i++) {
-                    ArmorStand stand = floatingItems.get(i);
+                    ItemDisplay stand = floatingItems.get(i);
                     double a = itemAngle + (2 * Math.PI / totalItems) * i;
                     double x = fountainCenter.getX() + radius * Math.cos(a);
                     double z = fountainCenter.getZ() + radius * Math.sin(a);
@@ -211,7 +209,7 @@ public class EventManager {
                     Location newLoc = new Location(endWorld, x, y, z);
                     stand.teleport(newLoc);
                     // Estela de partículas detrás de cada item
-                    endWorld.spawnParticle(Particle.SOUL_FIRE_FLAME, newLoc.clone().add(0, 1, 0), 1, 0.05, 0.05, 0.05, 0.005);
+                    endWorld.spawnParticle(Particle.SOUL_FIRE_FLAME, newLoc, 1, 0.05, 0.05, 0.05, 0.005);
                 }
                 // Items giran en sentido horario
                 itemAngle += speed;
@@ -294,7 +292,7 @@ public class EventManager {
                 // Activar un nuevo cristal cuando toque
                 if (activated < endCrystals.size() && tick % ticksPerCrystal == 1) {
                     EnderCrystal crystal = endCrystals.get(activated);
-                    ArmorStand nearest = findNearestItem(crystal.getLocation());
+                    ItemDisplay nearest = findNearestItem(crystal.getLocation());
 
                     // Corte de cámara: posicionarse cerca del cristal mirando hacia la fuente
                     Location crystalLoc = crystal.getLocation();
@@ -324,12 +322,12 @@ public class EventManager {
                 // Actualizar beams activos
                 for (int i = 0; i < Math.min(activated, endCrystals.size()); i++) {
                     EnderCrystal crystal = endCrystals.get(i);
-                    ArmorStand nearest = findNearestItem(crystal.getLocation());
+                    ItemDisplay nearest = findNearestItem(crystal.getLocation());
                     if (nearest != null) {
                         crystal.setBeamTarget(nearest.getLocation());
                         plugin.getVoidEffects().drawCrystalBeam(
                                 crystal.getLocation(),
-                                nearest.getLocation().add(0, 1, 0), 15);
+                                nearest.getLocation(), 15);
                     }
                 }
 
@@ -370,8 +368,8 @@ public class EventManager {
             @Override
             public void run() {
                 tick++;
-                for (ArmorStand stand : floatingItems) {
-                    plugin.getVoidEffects().drawDarkBeam(stand.getLocation().add(0, 1, 0), eggTarget, 20);
+                for (ItemDisplay stand : floatingItems) {
+                    plugin.getVoidEffects().drawDarkBeam(stand.getLocation(), eggTarget, 20);
                 }
                 // Partículas de energía acumulándose en el huevo
                 endWorld.spawnParticle(Particle.PORTAL, eggTarget, 10, 0.3, 0.3, 0.3, 0.5);
@@ -397,53 +395,151 @@ public class EventManager {
         // El gigante empieza MUY lejos/abajo y sube con animación
         Location giantStart = giantTarget.clone().add(20, -30, 0);
 
-        // Cámara mirando al punto de llegada del gigante — transición suave
-        Location giantCam = fountainCenter.clone().add(10, 8, 0);
-        lookAt(giantCam, giantTarget);
-        cam.smoothTransition(giantCam, 35);
+        // ── CÁMARA CINEMÁTICA EN 3 ETAPAS ──
+        // Etapa 1: toma amplia desde el cielo mirando hacia la fuente
+        Location wideShot = fountainCenter.clone().add(-20, 35, -20);
+        lookAt(wideShot, giantTarget);
+        cam.smoothTransition(wideShot, 30);
 
-        // Efectos de presagio: sonido, partículas oscuras, pantalla sacudiéndose
+        // Etapa 2: zoom acercándose al gigante (después de 50 ticks)
+        scheduleTask(new BukkitRunnable() { public void run() {
+            Location zoomShot = fountainCenter.clone().add(25, 18, 10);
+            lookAt(zoomShot, giantTarget);
+            cam.smoothTransition(zoomShot, 50);
+        }}.runTaskLater(plugin, 50L));
+
+        // Etapa 3: órbita lenta alrededor del gigante
+        scheduleTask(new BukkitRunnable() { public void run() {
+            BukkitTask orbitCam = new BukkitRunnable() {
+                double angle = 0;
+                @Override public void run() {
+                    angle += 0.012;
+                    double cx = giantTarget.getX() + 18 * Math.cos(angle);
+                    double cz = giantTarget.getZ() + 18 * Math.sin(angle);
+                    Location orbit = new Location(endWorld, cx, giantTarget.getY() + 8, cz);
+                    lookAt(orbit, giantTarget.clone().add(0, 3, 0));
+                    cam.teleportAll(orbit);
+                }
+            }.runTaskTimer(plugin, 0L, 1L);
+            activeTasks.add(orbitCam);
+            // Cancelar la órbita tras la fase
+            scheduleTask(new BukkitRunnable() { public void run() {
+                if (!orbitCam.isCancelled()) orbitCam.cancel();
+            }}.runTaskLater(plugin, 190L));
+        }}.runTaskLater(plugin, 110L));
+
+        // Efectos de presagio: sonido grave, reverberante
         endWorld.playSound(fountainCenter, Sound.ENTITY_WARDEN_EMERGE, 2.0f, 0.3f);
         endWorld.playSound(fountainCenter, Sound.AMBIENT_CAVE, 2.0f, 0.5f);
+        endWorld.playSound(fountainCenter, Sound.BLOCK_BEACON_DEACTIVATE, 3.0f, 0.4f);
+        endWorld.playSound(fountainCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 2.5f, 0.5f);
 
         // Spawnar gigante en posición inicial (invisible al principio por la distancia)
         cinematicGiant = plugin.getBossController().spawnCinematicGiant(giantStart, fountainCenter);
 
+        // ── TORNADO DE VACÍO alrededor de la posición final del gigante ──
+        BukkitTask voidTornado = new BukkitRunnable() {
+            int tick = 0;
+            @Override public void run() {
+                if (tick > 80) { cancel(); return; }
+                double baseY = giantTarget.getY() - 25 + tick * 0.5;
+                for (double y = 0; y < 30; y += 1.0) {
+                    double spiralAngle = tick * 0.25 + y * 0.6;
+                    double r = 5.0 - (y / 30.0) * 3.5;
+                    double px = giantTarget.getX() + r * Math.cos(spiralAngle);
+                    double pz = giantTarget.getZ() + r * Math.sin(spiralAngle);
+                    Location p = new Location(endWorld, px, baseY + y, pz);
+                    Particle.DustOptions dark = new Particle.DustOptions(
+                            Color.fromRGB(20, 0, 40), 2.5f);
+                    endWorld.spawnParticle(Particle.DUST, p, 1, 0, 0, 0, 0, dark);
+                    if ((int) y % 3 == 0) {
+                        endWorld.spawnParticle(Particle.SMOKE, p, 1, 0.2, 0.2, 0.2, 0.02);
+                    }
+                    // Chispas moradas dispersas
+                    if (tick % 2 == 0 && (int) y % 4 == 0) {
+                        Particle.DustOptions purple = new Particle.DustOptions(
+                                Color.fromRGB(120, 0, 180), 2.0f);
+                        endWorld.spawnParticle(Particle.DUST, p, 1, 0.3, 0.3, 0.3, 0, purple);
+                    }
+                }
+                tick++;
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+        activeTasks.add(voidTornado);
+
         // Animación de entrada: el gigante se eleva desde las profundidades
         scheduleTask(new BukkitRunnable() {
             int tick = 0;
-            final int duration = 60; // 3 segundos de animación
+            final int duration = 60;
             @Override
             public void run() {
                 if (tick >= duration) {
                     cancel();
-                    // Asegurar posición final con yaw mirando a la fuente
                     double finalDx = fountainCenter.getX() - giantTarget.getX();
                     double finalDz = fountainCenter.getZ() - giantTarget.getZ();
                     giantTarget.setYaw((float) Math.toDegrees(Math.atan2(-finalDx, finalDz)));
                     giantTarget.setPitch(0);
                     cinematicGiant.teleport(giantTarget);
                     plugin.getVoidEffects().spawnGiantAura(cinematicGiant);
+
+                    // ── ONDA DE CHOQUE al llegar ──
                     endWorld.playSound(giantTarget, Sound.ENTITY_WARDEN_ROAR, 3.0f, 0.4f);
+                    endWorld.playSound(giantTarget, Sound.ENTITY_GENERIC_EXPLODE, 3.0f, 0.3f);
+                    endWorld.playSound(giantTarget, Sound.ENTITY_WITHER_SPAWN, 2.5f, 0.6f);
+                    new BukkitRunnable() {
+                        double radius = 1;
+                        @Override public void run() {
+                            if (radius > 25) { cancel(); return; }
+                            int points = (int) (radius * 8);
+                            for (int i = 0; i < points; i++) {
+                                double a = (2 * Math.PI / points) * i;
+                                Location p = new Location(endWorld,
+                                        giantTarget.getX() + radius * Math.cos(a),
+                                        giantTarget.getY() - 12,
+                                        giantTarget.getZ() + radius * Math.sin(a));
+                                Particle.DustOptions dark = new Particle.DustOptions(
+                                        Color.fromRGB(40, 0, 60), 3.0f);
+                                endWorld.spawnParticle(Particle.DUST, p, 1, 0, 0, 0, 0, dark);
+                                if (i % 3 == 0) {
+                                    endWorld.spawnParticle(Particle.LARGE_SMOKE, p, 1, 0.2, 0.1, 0.2, 0.01);
+                                }
+                            }
+                            radius += 1.5;
+                        }
+                    }.runTaskTimer(plugin, 0L, 1L);
                     return;
                 }
                 double t = (double) tick / duration;
-                double smooth = t * t * (3 - 2 * t); // smoothstep
+                double smooth = t * t * (3 - 2 * t);
                 double x = giantStart.getX() + (giantTarget.getX() - giantStart.getX()) * smooth;
                 double y = giantStart.getY() + (giantTarget.getY() - giantStart.getY()) * smooth;
                 double z = giantStart.getZ() + (giantTarget.getZ() - giantStart.getZ()) * smooth;
                 Location current = new Location(endWorld, x, y, z);
-                // Recalcular yaw para que siempre mire a la fuente/cámara
                 double fdx = fountainCenter.getX() - x;
                 double fdz = fountainCenter.getZ() - z;
                 current.setYaw((float) Math.toDegrees(Math.atan2(-fdx, fdz)));
                 current.setPitch(0);
                 cinematicGiant.teleport(current);
 
-                // Partículas oscuras durante la subida
-                Particle.DustOptions dark = new Particle.DustOptions(org.bukkit.Color.fromRGB(20, 0, 40), 3.0f);
-                endWorld.spawnParticle(Particle.DUST, current.clone().add(0, 6, 0), 5, 3, 4, 3, 0, dark);
-                endWorld.spawnParticle(Particle.SMOKE, current.clone().add(0, 6, 0), 3, 2, 3, 2, 0.02);
+                // MUCHAS partículas durante la subida
+                Particle.DustOptions dark = new Particle.DustOptions(
+                        Color.fromRGB(20, 0, 40), 3.5f);
+                endWorld.spawnParticle(Particle.DUST, current.clone().add(0, 6, 0), 12, 4, 5, 4, 0, dark);
+                Particle.DustOptions purple = new Particle.DustOptions(
+                        Color.fromRGB(90, 0, 140), 2.8f);
+                endWorld.spawnParticle(Particle.DUST, current.clone().add(0, 6, 0), 8, 3, 4, 3, 0, purple);
+                endWorld.spawnParticle(Particle.LARGE_SMOKE, current.clone().add(0, 6, 0), 5, 2, 3, 2, 0.03);
+                endWorld.spawnParticle(Particle.SOUL_FIRE_FLAME, current.clone().add(0, 2, 0), 4, 2, 2, 2, 0.02);
+                endWorld.spawnParticle(Particle.SQUID_INK, current.clone().add(0, 6, 0), 3, 2, 2, 2, 0.05);
+                // Chispas de energía oscura alrededor
+                for (int i = 0; i < 6; i++) {
+                    double a = tick * 0.2 + (Math.PI / 3) * i;
+                    Location sp = current.clone().add(
+                            Math.cos(a) * 5, 4 + Math.sin(tick * 0.15) * 2, Math.sin(a) * 5);
+                    Particle.DustOptions spark = new Particle.DustOptions(
+                            Color.fromRGB(200, 50, 255), 1.5f);
+                    endWorld.spawnParticle(Particle.DUST, sp, 1, 0, 0, 0, 0, spark);
+                }
 
                 tick++;
             }
@@ -487,7 +583,7 @@ public class EventManager {
         lookAt(generalShot, fountainCenter.clone().add(0, 5, 0));
         cam.smoothTransition(generalShot, 30);
 
-        // Explotar cristales uno a uno
+        // Explotar cristales uno a uno con espectáculo masivo
         new BukkitRunnable() {
             int i = 0;
             @Override
@@ -496,26 +592,154 @@ public class EventManager {
                     cancel();
                     return;
                 }
-                EnderCrystal crystal = endCrystals.get(i);
-                Location crystalLoc = crystal.getLocation();
-                plugin.getVoidEffects().bigExplosion(crystalLoc);
-                // Partículas de explosión masivas cuando el gigante destruye los cristales
-                crystalLoc.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, crystalLoc, 5, 1, 1, 1, 0);
-                Particle.DustOptions shockwave = new Particle.DustOptions(Color.fromRGB(255, 100, 0), 3.5f);
-                crystalLoc.getWorld().spawnParticle(Particle.DUST, crystalLoc, 30, 3, 3, 3, 0, shockwave);
-                Particle.DustOptions glow = new Particle.DustOptions(Color.fromRGB(255, 200, 50), 2.5f);
-                crystalLoc.getWorld().spawnParticle(Particle.DUST, crystalLoc, 20, 2, 2, 2, 0, glow);
-                crystalLoc.getWorld().spawnParticle(Particle.FLAME, crystalLoc, 40, 2, 2, 2, 0.15);
-                crystalLoc.getWorld().spawnParticle(Particle.LAVA, crystalLoc, 15, 1.5, 1.5, 1.5, 0);
-                crystalLoc.getWorld().playSound(crystalLoc, Sound.ENTITY_GENERIC_EXPLODE, 2.0f, 0.5f);
-                crystalLoc.getWorld().playSound(crystalLoc, Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 2.0f, 0.7f);
-                crystal.remove();
+                final EnderCrystal crystal = endCrystals.get(i);
+                final Location crystalLoc = crystal.getLocation().clone();
+                final World w = crystalLoc.getWorld();
+
+                // ── FASE 1: Presagio (10 ticks) — el cristal vibra y brilla ──
+                new BukkitRunnable() {
+                    int pre = 0;
+                    @Override public void run() {
+                        if (pre >= 10 || crystal.isDead()) {
+                            cancel();
+                            return;
+                        }
+                        // Aura creciente alrededor del cristal
+                        double r = 0.5 + pre * 0.15;
+                        for (int a = 0; a < 20; a++) {
+                            double ang = (2 * Math.PI / 20) * a + pre * 0.3;
+                            Location p = crystalLoc.clone().add(
+                                    r * Math.cos(ang), Math.sin(ang * 3) * 0.3, r * Math.sin(ang));
+                            Particle.DustOptions glow = new Particle.DustOptions(
+                                    Color.fromRGB(255, 200, 50), 1.8f);
+                            w.spawnParticle(Particle.DUST, p, 1, 0, 0, 0, 0, glow);
+                            w.spawnParticle(Particle.END_ROD, p, 1, 0.05, 0.05, 0.05, 0.02);
+                        }
+                        if (pre == 0) {
+                            w.playSound(crystalLoc, Sound.BLOCK_BEACON_POWER_SELECT, 2.0f, 2.0f);
+                            w.playSound(crystalLoc, Sound.ITEM_TRIDENT_THUNDER, 1.5f, 1.8f);
+                        }
+                        if (pre == 5) {
+                            w.playSound(crystalLoc, Sound.BLOCK_BELL_RESONATE, 2.0f, 1.2f);
+                        }
+                        pre++;
+                    }
+                }.runTaskTimer(plugin, 0L, 1L);
+
+                // ── FASE 2: ¡EXPLOSIÓN! (tick 10) ──
+                scheduleTask(new BukkitRunnable() { public void run() {
+                    // Sonidos masivos en capas
+                    w.playSound(crystalLoc, Sound.ENTITY_GENERIC_EXPLODE, 3.0f, 0.4f);
+                    w.playSound(crystalLoc, Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 3.0f, 0.6f);
+                    w.playSound(crystalLoc, Sound.ENTITY_WITHER_BREAK_BLOCK, 2.5f, 0.8f);
+                    w.playSound(crystalLoc, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 2.0f, 0.5f);
+                    w.playSound(crystalLoc, Sound.ITEM_TRIDENT_THUNDER, 2.0f, 1.5f);
+
+                    plugin.getVoidEffects().bigExplosion(crystalLoc);
+
+                    // Core de la explosión — múltiples tipos de partículas
+                    w.spawnParticle(Particle.EXPLOSION_EMITTER, crystalLoc, 8, 1.5, 1.5, 1.5, 0);
+                    w.spawnParticle(Particle.EXPLOSION, crystalLoc, 15, 1, 1, 1, 0);
+                    w.spawnParticle(Particle.FLASH, crystalLoc, 5, 0.5, 0.5, 0.5, 0);
+                    w.spawnParticle(Particle.LAVA, crystalLoc, 30, 2, 2, 2, 0);
+                    w.spawnParticle(Particle.FLAME, crystalLoc, 80, 2.5, 2.5, 2.5, 0.2);
+                    w.spawnParticle(Particle.SOUL_FIRE_FLAME, crystalLoc, 40, 2, 2, 2, 0.1);
+                    w.spawnParticle(Particle.FIREWORK, crystalLoc, 50, 2, 2, 2, 0.3);
+                    w.spawnParticle(Particle.LARGE_SMOKE, crystalLoc, 40, 3, 3, 3, 0.05);
+
+                    // Dust de colores variados (naranja → amarillo → blanco)
+                    for (int c = 0; c < 60; c++) {
+                        Particle.DustOptions orange = new Particle.DustOptions(
+                                Color.fromRGB(255, 100 + (int)(Math.random() * 100), 0), 3.0f);
+                        w.spawnParticle(Particle.DUST, crystalLoc, 1,
+                                Math.random() * 4 - 2, Math.random() * 4 - 2, Math.random() * 4 - 2, 0, orange);
+                    }
+                    for (int c = 0; c < 40; c++) {
+                        Particle.DustOptions gold = new Particle.DustOptions(
+                                Color.fromRGB(255, 200 + (int)(Math.random() * 55), 50), 2.5f);
+                        w.spawnParticle(Particle.DUST, crystalLoc, 1,
+                                Math.random() * 3 - 1.5, Math.random() * 3 - 1.5, Math.random() * 3 - 1.5, 0, gold);
+                    }
+                    for (int c = 0; c < 30; c++) {
+                        Particle.DustOptions white = new Particle.DustOptions(
+                                Color.fromRGB(255, 240, 200), 2.0f);
+                        w.spawnParticle(Particle.DUST, crystalLoc, 1,
+                                Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1, 0, white);
+                    }
+
+                    // Rayos radiales en esfera 3D
+                    int rays = 24;
+                    for (int r = 0; r < rays; r++) {
+                        double phi = Math.acos(1 - 2.0 * r / rays);
+                        double theta = Math.PI * (1 + Math.sqrt(5)) * r;
+                        double dx = Math.sin(phi) * Math.cos(theta);
+                        double dy = Math.cos(phi);
+                        double dz = Math.sin(phi) * Math.sin(theta);
+                        for (double d = 0.5; d < 6; d += 0.6) {
+                            Location p = crystalLoc.clone().add(dx * d, dy * d, dz * d);
+                            Particle.DustOptions spark = new Particle.DustOptions(
+                                    Color.fromRGB(255, 150, 0), 1.8f);
+                            w.spawnParticle(Particle.DUST, p, 1, 0, 0, 0, 0, spark);
+                            if (d < 3) {
+                                w.spawnParticle(Particle.END_ROD, p, 1, 0.05, 0.05, 0.05, 0.02);
+                            }
+                        }
+                    }
+
+                    crystal.remove();
+
+                    // ── FASE 3: Onda de choque expandiéndose ──
+                    new BukkitRunnable() {
+                        double radius = 1;
+                        @Override public void run() {
+                            if (radius > 18) { cancel(); return; }
+                            int points = (int)(radius * 14);
+                            for (int a = 0; a < points; a++) {
+                                double ang = (2 * Math.PI / points) * a;
+                                Location p1 = crystalLoc.clone().add(
+                                        radius * Math.cos(ang), 0, radius * Math.sin(ang));
+                                Location p2 = crystalLoc.clone().add(
+                                        radius * Math.cos(ang), 1.5, radius * Math.sin(ang));
+                                Particle.DustOptions shock = new Particle.DustOptions(
+                                        Color.fromRGB(255, (int)(80 + radius * 8), 0), 2.5f);
+                                w.spawnParticle(Particle.DUST, p1, 1, 0, 0, 0, 0, shock);
+                                w.spawnParticle(Particle.DUST, p2, 1, 0, 0, 0, 0, shock);
+                                if (a % 4 == 0) {
+                                    w.spawnParticle(Particle.FLAME, p1, 1, 0.1, 0.05, 0.1, 0.01);
+                                }
+                            }
+                            radius += 1.2;
+                        }
+                    }.runTaskTimer(plugin, 0L, 1L);
+
+                    // ── FASE 4: Brasas que caen lentamente (30 ticks) ──
+                    new BukkitRunnable() {
+                        int embers = 0;
+                        @Override public void run() {
+                            if (embers >= 30) { cancel(); return; }
+                            for (int e = 0; e < 8; e++) {
+                                Location p = crystalLoc.clone().add(
+                                        Math.random() * 8 - 4,
+                                        Math.random() * 3,
+                                        Math.random() * 8 - 4);
+                                Particle.DustOptions ember = new Particle.DustOptions(
+                                        Color.fromRGB(255, 80 + (int)(Math.random() * 120), 0), 1.5f);
+                                w.spawnParticle(Particle.DUST, p, 1, 0, -0.1, 0, 0, ember);
+                                if (e < 3) {
+                                    w.spawnParticle(Particle.SMOKE, p, 1, 0.2, 0.2, 0.2, 0.02);
+                                }
+                            }
+                            embers++;
+                        }
+                    }.runTaskTimer(plugin, 3L, 2L);
+                }}.runTaskLater(plugin, 10L));
+
                 i++;
             }
-        }.runTaskTimer(plugin, 10L, 8L);
+        }.runTaskTimer(plugin, 10L, 14L); // 14 ticks entre cristales para que se vea bien
 
         // Toma cercana vertical después de las explosiones
-        long explosionTime = 10 + (long) endCrystals.size() * 8 + 20;
+        long explosionTime = 10 + (long) endCrystals.size() * 14 + 30;
         scheduleTask(new BukkitRunnable() {
             @Override
             public void run() {
@@ -530,8 +754,8 @@ public class EventManager {
                     int tick = 0;
                     @Override
                     public void run() {
-                        for (ArmorStand stand : floatingItems) {
-                            plugin.getVoidEffects().drawDarkBeam(stand.getLocation().add(0, 1, 0), eggRef, 20);
+                        for (ItemDisplay stand : floatingItems) {
+                            plugin.getVoidEffects().drawDarkBeam(stand.getLocation(), eggRef, 20);
                         }
                         endWorld.spawnParticle(Particle.SOUL_FIRE_FLAME, eggRef, 5, 0.3, 0.3, 0.3, 0.02);
                         tick++;
@@ -775,11 +999,10 @@ public class EventManager {
         // Re-crear los items flotantes para la animación final
         spawnFloatingItemsForOutro();
         Location eggLoc = fountainCenter.clone().add(0, 3.5, 0);
-        dragonEgg = endWorld.spawn(eggLoc, ArmorStand.class, stand -> {
-            stand.setVisible(false);
-            stand.setGravity(false);
-            stand.setMarker(true);
-            stand.getEquipment().setHelmet(new ItemStack(Material.DRAGON_EGG));
+        dragonEgg = endWorld.spawn(eggLoc, ItemDisplay.class, display -> {
+            display.setItemStack(new ItemStack(Material.DRAGON_EGG));
+            display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            display.setBillboard(Display.Billboard.VERTICAL);
         });
 
         // Cámara mirando la escena — transición suave
@@ -795,14 +1018,14 @@ public class EventManager {
                 if (tick < 40) {
                     // Rayos que se debilitan
                     Location eggPos = dragonEgg != null ? dragonEgg.getLocation() : fountainCenter.clone().add(0, 3, 0);
-                    for (ArmorStand stand : floatingItems) {
+                    for (ItemDisplay stand : floatingItems) {
                         if (tick % (2 + tick / 10) == 0) {
-                            plugin.getVoidEffects().drawDarkBeam(stand.getLocation().add(0, 1, 0), eggPos, Math.max(3, 20 - tick / 2));
+                            plugin.getVoidEffects().drawDarkBeam(stand.getLocation(), eggPos, Math.max(3, 20 - tick / 2));
                         }
                     }
                 } else if (tick < 80) {
                     // Los items caen al vacío
-                    for (ArmorStand stand : floatingItems) {
+                    for (ItemDisplay stand : floatingItems) {
                         Location loc = stand.getLocation();
                         loc.add(0, -0.15, 0);
                         stand.teleport(loc);
@@ -908,7 +1131,7 @@ public class EventManager {
                             lore.add(Component.empty());
                             lore.add(Component.text("✦ Habilidad: Impulso Ascendente", NamedTextColor.YELLOW)
                                     .decorate(TextDecoration.BOLD));
-                            lore.add(Component.text("Estando en el suelo, salta dos veces seguidas", NamedTextColor.GRAY));
+                            lore.add(Component.text("Estando en el suelo, mantén Shift y pulsa Espacio", NamedTextColor.GRAY));
                             lore.add(Component.text("para recibir un poderoso impulso hacia el cielo.", NamedTextColor.GRAY));
                             lore.add(Component.text("Usa el impulso para tomar vuelo sin necesidad", NamedTextColor.GRAY));
                             lore.add(Component.text("de lanzarte desde las alturas.", NamedTextColor.GRAY));
@@ -927,9 +1150,32 @@ public class EventManager {
                             NamedTextColor.GOLD, 80);
                 }}.runTaskLater(plugin, 560L));
 
-                // Regenerar la isla
+                // Regenerar la isla con cinemática orbital
                 scheduleTask(new BukkitRunnable() { public void run() {
+                    Location regenCamStart = fountainCenter.clone().add(30, 25, 0);
+                    lookAt(regenCamStart, fountainCenter.clone().add(0, 2, 0));
+                    cam.smoothTransition(regenCamStart, 30);
+
+                    BukkitTask regenOrbitCam = new BukkitRunnable() {
+                        double camAngle = 0;
+                        int camTick = 0;
+                        @Override
+                        public void run() {
+                            camAngle += 0.015;
+                            camTick++;
+                            double radius = 35 + Math.sin(camTick * 0.008) * 10;
+                            double yOff = 20 + Math.sin(camTick * 0.012) * 8;
+                            double cx = fountainCenter.getX() + radius * Math.cos(camAngle);
+                            double cz = fountainCenter.getZ() + radius * Math.sin(camAngle);
+                            Location camLoc = new Location(endWorld, cx, fountainCenter.getY() + yOff, cz);
+                            lookAt(camLoc, fountainCenter.clone().add(0, 2, 0));
+                            cam.teleportAll(camLoc);
+                        }
+                    }.runTaskTimer(plugin, 40L, 1L);
+                    activeTasks.add(regenOrbitCam);
+
                     plugin.getArenaManager().regenerateEndIsland(fountainCenter, 400, () -> {
+                        regenOrbitCam.cancel();
                         phase17_LightDragonLeaves(lightDragon, players);
                     });
                 }}.runTaskLater(plugin, 660L));
@@ -942,39 +1188,282 @@ public class EventManager {
     // ======================================================================
     private void phase17_LightDragonLeaves(EnderDragon lightDragon, List<Player> players) {
         CinematicEngine cam = plugin.getCinematicEngine();
+        if (lightDragon == null || lightDragon.isDead()) {
+            endEvent(players);
+            return;
+        }
+        final Location startLoc = lightDragon.getLocation().clone();
 
-        cam.showDialog("LA LUZ", "Adiós, héroes. Que la luz os guíe siempre.",
-                NamedTextColor.GOLD, 80);
+        // IMPORTANTE: habilitar AI para que las alas aleteen naturalmente
+        lightDragon.setAI(true);
+        lightDragon.setGravity(false);
+        lightDragon.setInvulnerable(true);
+        try { lightDragon.setPhase(EnderDragon.Phase.HOVER); } catch (Throwable ignored) {}
 
-        // Animar al dragón volando hacia arriba
+        // Despedida en chat
+        Component divider = Component.text("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.GOLD);
+        for (Player p : players) {
+            if (p.isOnline()) {
+                p.sendMessage(Component.empty());
+                p.sendMessage(divider);
+                p.sendMessage(Component.text("  ✦ ", NamedTextColor.GOLD)
+                        .append(Component.text("La Luz", NamedTextColor.YELLOW).decorate(TextDecoration.BOLD))
+                        .append(Component.text(" despliega sus alas doradas...", NamedTextColor.GOLD)));
+            }
+        }
+
+        cam.showDialog("LA LUZ", "Ha llegado el momento de partir...",
+                NamedTextColor.GOLD, 60);
+
+        scheduleTask(new BukkitRunnable() { public void run() {
+            cam.showDialog("LA LUZ", "Pero jamás olvidaré lo que habéis hecho por mí.",
+                    NamedTextColor.GOLD, 60);
+        }}.runTaskLater(plugin, 80L));
+
+        scheduleTask(new BukkitRunnable() { public void run() {
+            cam.showDialog("LA LUZ", "¡Adiós, héroes! ¡Que la luz os guíe siempre!",
+                    NamedTextColor.GOLD, 80);
+        }}.runTaskLater(plugin, 160L));
+
+        // Animación espectacular de vuelo — movimiento SUAVE cada tick
         scheduleTask(new BukkitRunnable() {
             @Override
             public void run() {
+                endWorld.playSound(startLoc, Sound.ENTITY_ENDER_DRAGON_FLAP, 3.0f, 1.5f);
+                endWorld.playSound(startLoc, Sound.BLOCK_BEACON_ACTIVATE, 2.0f, 1.2f);
+
                 new BukkitRunnable() {
                     int tick = 0;
+                    double spiralAngle = 0;
+                    // Posición actual del dragón (interpolada suavemente)
+                    double curX = startLoc.getX();
+                    double curY = startLoc.getY();
+                    double curZ = startLoc.getZ();
+                    double curYaw = startLoc.getYaw();
+                    double curPitch = 0;
+
                     @Override
                     public void run() {
-                        if (lightDragon == null || lightDragon.isDead() || tick >= 120) {
-                            if (lightDragon != null && !lightDragon.isDead()) lightDragon.remove();
+                        if (lightDragon.isDead()) {
                             cancel();
-
-                            // Terminar evento
                             endEvent(players);
                             return;
                         }
-                        Location loc = lightDragon.getLocation();
-                        loc.add(0, 0.5, 0);
-                        lightDragon.teleport(loc);
 
-                        // Partículas doradas
-                        endWorld.spawnParticle(Particle.END_ROD, loc, 5, 1, 1, 1, 0.05);
-                        Particle.DustOptions gold = new Particle.DustOptions(Color.fromRGB(255, 215, 0), 2.0f);
-                        endWorld.spawnParticle(Particle.DUST, loc, 3, 2, 2, 2, 0, gold);
+                        double tgtX = curX, tgtY = curY, tgtZ = curZ;
+
+                        if (tick < 80) {
+                            // ── Fase A: Ascenso lento (4s, 8 bloques arriba) ──
+                            tgtX = startLoc.getX();
+                            tgtY = startLoc.getY() + (tick / 80.0) * 8;
+                            tgtZ = startLoc.getZ();
+
+                            double auraRadius = 2 + tick * 0.04;
+                            for (int i = 0; i < 20; i++) {
+                                double a = (2 * Math.PI / 20) * i + tick * 0.1;
+                                Location pt = new Location(endWorld,
+                                        curX + auraRadius * Math.cos(a),
+                                        curY + Math.sin(a * 3) * 0.5,
+                                        curZ + auraRadius * Math.sin(a));
+                                Particle.DustOptions gold = new Particle.DustOptions(
+                                        Color.fromRGB(255, 215, 0), 2.0f);
+                                endWorld.spawnParticle(Particle.DUST, pt, 1, 0, 0, 0, 0, gold);
+                                endWorld.spawnParticle(Particle.END_ROD, pt, 1, 0.1, 0.1, 0.1, 0.01);
+                            }
+
+                            // Cámara orbitando al dragón de cerca
+                            double ca = tick * 0.025;
+                            Location camLoc = new Location(endWorld,
+                                    curX + Math.cos(ca) * 14,
+                                    curY + 2,
+                                    curZ + Math.sin(ca) * 14);
+                            lookAt(camLoc, new Location(endWorld, curX, curY, curZ));
+                            cam.teleportAll(camLoc);
+
+                        } else if (tick < 260) {
+                            // ── Fase B: Espiral ascendente lenta con figura de sol (8s) ──
+                            int spiralTick = tick - 80;
+                            spiralAngle += 0.035; // más lento = más natural
+                            double radius = 15 + Math.sin(spiralTick * 0.03) * 4;
+                            double y = startLoc.getY() + 8 + spiralTick * 0.08;
+                            tgtX = fountainCenter.getX() + radius * Math.cos(spiralAngle);
+                            tgtY = y;
+                            tgtZ = fountainCenter.getZ() + radius * Math.sin(spiralAngle);
+
+                            // Figura de sol con rayos de partículas
+                            if (spiralTick % 2 == 0) {
+                                double sunRadius = 4 + spiralTick * 0.03;
+                                int rays = 8;
+                                for (int ray = 0; ray < rays; ray++) {
+                                    double rayAngle = (2 * Math.PI / rays) * ray + spiralTick * 0.015;
+                                    for (double d = 0; d < sunRadius; d += 0.5) {
+                                        Location sunP = new Location(endWorld,
+                                                fountainCenter.getX() + d * Math.cos(rayAngle),
+                                                y - 3,
+                                                fountainCenter.getZ() + d * Math.sin(rayAngle));
+                                        Particle.DustOptions gold = new Particle.DustOptions(
+                                                Color.fromRGB(255, (int) (200 + Math.sin(d) * 55), 0), 1.5f);
+                                        endWorld.spawnParticle(Particle.DUST, sunP, 1, 0, 0, 0, 0, gold);
+                                    }
+                                }
+                                // Círculo exterior del sol
+                                for (int i = 0; i < 36; i++) {
+                                    double cAngle = (2 * Math.PI / 36) * i;
+                                    Location cp = new Location(endWorld,
+                                            fountainCenter.getX() + sunRadius * Math.cos(cAngle),
+                                            y - 3,
+                                            fountainCenter.getZ() + sunRadius * Math.sin(cAngle));
+                                    endWorld.spawnParticle(Particle.END_ROD, cp, 1, 0.05, 0.05, 0.05, 0.01);
+                                }
+                            }
+
+                            // Estela dorada del dragón
+                            Location dragonLoc = new Location(endWorld, curX, curY, curZ);
+                            endWorld.spawnParticle(Particle.END_ROD, dragonLoc, 8, 1.2, 1.2, 1.2, 0.05);
+                            Particle.DustOptions trail = new Particle.DustOptions(
+                                    Color.fromRGB(255, 230, 100), 2.0f);
+                            endWorld.spawnParticle(Particle.DUST, dragonLoc, 6, 1.5, 1.5, 1.5, 0, trail);
+
+                            // Cámara orbitando en sentido contrario al dragón
+                            double camAngle = spiralAngle + Math.PI;
+                            Location camLoc = new Location(endWorld,
+                                    fountainCenter.getX() + 30 * Math.cos(camAngle),
+                                    y + 4,
+                                    fountainCenter.getZ() + 30 * Math.sin(camAngle));
+                            lookAt(camLoc, dragonLoc);
+                            cam.teleportAll(camLoc);
+
+                            if (spiralTick == 40) {
+                                for (Player p : players) {
+                                    if (p.isOnline()) p.sendMessage(
+                                            Component.text("  ✦ ", NamedTextColor.GOLD)
+                                                    .append(Component.text(
+                                                            "Un sol dorado se dibuja en el cielo del End...",
+                                                            NamedTextColor.YELLOW)));
+                                }
+                            }
+                            if (spiralTick == 100) {
+                                endWorld.playSound(fountainCenter,
+                                        Sound.ENTITY_ENDER_DRAGON_FLAP, 2.0f, 1.8f);
+                            }
+
+                        } else if (tick < 440) {
+                            // ── Fase C: Acelera hacia el horizonte (9s) ──
+                            int flyTick = tick - 260;
+                            // Velocidad gradual: 0.15 -> 1.2 bloques/tick
+                            double speed = 0.15 + flyTick * 0.006;
+                            tgtX = curX + speed;
+                            tgtY = curY + 0.08;
+                            tgtZ = curZ + speed * 0.4;
+
+                            // Estela dorada masiva
+                            Location dragonLoc = new Location(endWorld, curX, curY, curZ);
+                            endWorld.spawnParticle(Particle.END_ROD, dragonLoc, 15, 2, 2, 2, 0.08);
+                            Particle.DustOptions gold = new Particle.DustOptions(
+                                    Color.fromRGB(255, 215, 0), 2.8f);
+                            endWorld.spawnParticle(Particle.DUST, dragonLoc, 12, 2.5, 2.5, 2.5, 0, gold);
+                            Particle.DustOptions white = new Particle.DustOptions(
+                                    Color.fromRGB(255, 255, 220), 1.8f);
+                            endWorld.spawnParticle(Particle.DUST, dragonLoc, 8, 2, 2, 2, 0, white);
+                            endWorld.spawnParticle(Particle.FIREWORK, dragonLoc, 4, 1.5, 1.5, 1.5, 0.05);
+
+                            // Cámara fija en torre alta mirando al dragón alejarse
+                            Location camLoc = fountainCenter.clone().add(0, 25, 0);
+                            lookAt(camLoc, dragonLoc);
+                            cam.teleportAll(camLoc);
+
+                            if (flyTick == 0) {
+                                endWorld.playSound(fountainCenter,
+                                        Sound.ENTITY_ENDER_DRAGON_FLAP, 3.0f, 1.5f);
+                            }
+                            if (flyTick == 40) {
+                                for (Player p : players) {
+                                    if (p.isOnline()) p.sendMessage(
+                                            Component.text("  ✦ ", NamedTextColor.GOLD)
+                                                    .append(Component.text(
+                                                            "La Luz se aleja hacia el horizonte, dejando una estela dorada...",
+                                                            NamedTextColor.YELLOW)));
+                                }
+                            }
+                            if (flyTick == 120) {
+                                for (Player p : players) {
+                                    if (p.isOnline()) p.sendMessage(
+                                            Component.text("  ✦ ", NamedTextColor.GOLD)
+                                                    .append(Component.text(
+                                                            "Su silueta se desvanece entre las estrellas...",
+                                                            NamedTextColor.YELLOW)));
+                                }
+                            }
+
+                        } else {
+                            // ── Fase D: Destello final y desaparición ──
+                            Location dragonLoc = new Location(endWorld, curX, curY, curZ);
+                            endWorld.spawnParticle(Particle.END_ROD, dragonLoc, 200, 6, 6, 6, 0.3);
+                            Particle.DustOptions flash = new Particle.DustOptions(
+                                    Color.fromRGB(255, 255, 200), 4.0f);
+                            endWorld.spawnParticle(Particle.DUST, dragonLoc, 100, 8, 8, 8, 0, flash);
+                            endWorld.spawnParticle(Particle.FLASH, dragonLoc, 3, 0, 0, 0, 0);
+                            endWorld.playSound(fountainCenter,
+                                    Sound.UI_TOAST_CHALLENGE_COMPLETE, 2.0f, 1.5f);
+                            endWorld.playSound(fountainCenter,
+                                    Sound.BLOCK_AMETHYST_BLOCK_CHIME, 2.0f, 1.0f);
+
+                            lightDragon.remove();
+                            cancel();
+
+                            for (Player p : players) {
+                                if (p.isOnline()) {
+                                    p.sendMessage(Component.text("  ✦ ", NamedTextColor.GOLD)
+                                            .append(Component.text("La Luz ha abandonado el End.",
+                                                    NamedTextColor.YELLOW).decorate(TextDecoration.BOLD)));
+                                    p.sendMessage(Component.text("  ✦ ", NamedTextColor.GOLD)
+                                            .append(Component.text(
+                                                    "Pero su legado permanece en vuestras alas.",
+                                                    NamedTextColor.GOLD)));
+                                    p.sendMessage(divider);
+                                    p.sendMessage(Component.empty());
+                                }
+                            }
+
+                            scheduleTask(new BukkitRunnable() {
+                                public void run() { endEvent(players); }
+                            }.runTaskLater(plugin, 60L));
+                            return;
+                        }
+
+                        // ── MOVIMIENTO SUAVE: interpolar hacia target con paso pequeño ──
+                        double dx = tgtX - curX;
+                        double dy = tgtY - curY;
+                        double dz = tgtZ - curZ;
+                        // Paso máximo por tick para que NO se vea teleportar
+                        double maxStep = 0.6;
+                        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        double factor = dist > maxStep ? (maxStep / dist) : 1.0;
+                        curX += dx * factor;
+                        curY += dy * factor;
+                        curZ += dz * factor;
+
+                        // Yaw/pitch siguiendo dirección de vuelo
+                        if (dist > 0.01) {
+                            double targetYaw = Math.toDegrees(Math.atan2(-dx, dz));
+                            double horiz = Math.sqrt(dx * dx + dz * dz);
+                            double targetPitch = -Math.toDegrees(Math.atan2(dy, Math.max(0.01, horiz)));
+                            targetPitch = Math.max(-25, Math.min(25, targetPitch));
+                            // Interpolación suave de yaw/pitch
+                            double yawDiff = ((targetYaw - curYaw + 540) % 360) - 180;
+                            curYaw += yawDiff * 0.15;
+                            curPitch += (targetPitch - curPitch) * 0.15;
+                        }
+
+                        Location finalPos = new Location(endWorld, curX, curY, curZ,
+                                (float) curYaw, (float) curPitch);
+                        lightDragon.teleport(finalPos);
+
                         tick++;
                     }
-                }.runTaskTimer(plugin, 0L, 2L);
+                }.runTaskTimer(plugin, 0L, 1L);
             }
-        }.runTaskLater(plugin, 100L));
+        }.runTaskLater(plugin, 220L));
     }
 
     /**
@@ -1153,11 +1642,11 @@ public class EventManager {
         activeTasks.add(idleTask);
     }
 
-    /** Busca el ArmorStand (item flotante) más cercano a una ubicación */
-    private ArmorStand findNearestItem(Location loc) {
-        ArmorStand nearest = null;
+    /** Busca el ItemDisplay (item flotante) más cercano a una ubicación */
+    private ItemDisplay findNearestItem(Location loc) {
+        ItemDisplay nearest = null;
         double minDist = Double.MAX_VALUE;
-        for (ArmorStand stand : floatingItems) {
+        for (ItemDisplay stand : floatingItems) {
             double dist = stand.getLocation().distanceSquared(loc);
             if (dist < minDist) {
                 minDist = dist;
@@ -1168,36 +1657,14 @@ public class EventManager {
     }
 
     /**
-     * Spawna un ArmorStand completamente invisible con el item en el slot correcto.
-     * Herramientas → mano principal (con brazo extendido)
-     * Casco → helmet, Peto → chestplate, Pantalones → leggings, Botas → boots
+     * Spawna un ItemDisplay con el item flotante.
+     * Reemplaza ArmorStand para evitar silueta fantasma en espectador.
      */
-    private ArmorStand spawnItemStand(Location loc, ItemStack item) {
-        Material mat = item.getType();
-        return endWorld.spawn(loc, ArmorStand.class, s -> {
-            s.setVisible(false);
-            s.setGravity(false);
-            s.setSmall(false);
-            s.setMarker(true);
-            s.setBasePlate(false);
-            s.setCustomNameVisible(false);
-            s.setCanPickupItems(false);
-            // Poner el item en su slot correspondiente
-            if (mat.name().contains("HELMET")) {
-                s.getEquipment().setHelmet(item);
-            } else if (mat.name().contains("CHESTPLATE")) {
-                s.getEquipment().setChestplate(item);
-            } else if (mat.name().contains("LEGGINGS")) {
-                s.getEquipment().setLeggings(item);
-            } else if (mat.name().contains("BOOTS")) {
-                s.getEquipment().setBoots(item);
-            } else {
-                // Herramientas/espadas → mano principal
-                s.setArms(true);
-                s.getEquipment().setItemInMainHand(item);
-                s.setRightArmPose(new org.bukkit.util.EulerAngle(
-                        Math.toRadians(-20), 0, Math.toRadians(-10)));
-            }
+    private ItemDisplay spawnItemStand(Location loc, ItemStack item) {
+        return endWorld.spawn(loc, ItemDisplay.class, display -> {
+            display.setItemStack(item);
+            display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            display.setBillboard(Display.Billboard.VERTICAL);
         });
     }
 

@@ -43,6 +43,14 @@ public class CinematicEngine {
             p.setGameMode(GameMode.SPECTATOR);
             viewers.add(p);
         }
+        // Vanish total: ocultar jugadores entre sí en espectador
+        for (Player a : viewers) {
+            for (Player b : viewers) {
+                if (a != b && a.isOnline() && b.isOnline()) {
+                    a.hidePlayer(plugin, b);
+                }
+            }
+        }
     }
 
     /**
@@ -52,6 +60,14 @@ public class CinematicEngine {
         active = false;
         if (currentCameraTask != null && !currentCameraTask.isCancelled()) {
             currentCameraTask.cancel();
+        }
+        // Restaurar visibilidad entre jugadores
+        for (Player a : viewers) {
+            for (Player b : viewers) {
+                if (a != b && a.isOnline() && b.isOnline()) {
+                    a.showPlayer(plugin, b);
+                }
+            }
         }
         for (Player p : viewers) {
             if (p.isOnline()) {

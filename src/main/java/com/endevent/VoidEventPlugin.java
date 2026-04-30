@@ -5,6 +5,7 @@ import com.endevent.boss.BossController;
 import com.endevent.cinematic.CinematicEngine;
 import com.endevent.commands.EventCommand;
 import com.endevent.effects.VoidEffects;
+import com.endevent.listener.ArmorStandVanishTask;
 import com.endevent.listener.ProtectionListener;
 import com.endevent.manager.EventManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -17,6 +18,7 @@ public class VoidEventPlugin extends JavaPlugin {
     private ArenaManager arenaManager;
     private BossController bossController;
     private VoidEffects voidEffects;
+    private ArmorStandVanishTask armorStandVanishTask;
 
     @Override
     public void onEnable() {
@@ -32,11 +34,14 @@ public class VoidEventPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new com.endevent.listener.ElytraAbilityListener(this), this);
 
+        this.armorStandVanishTask = new ArmorStandVanishTask(this);
+
         getLogger().info("VoidEvent cargado — /voidevent start para iniciar");
     }
 
     @Override
     public void onDisable() {
+        if (armorStandVanishTask != null) armorStandVanishTask.stop();
         if (eventManager != null && eventManager.isRunning()) {
             eventManager.forceStop();
         }

@@ -1,5 +1,6 @@
 package com.endevent.listener;
 
+import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import com.endevent.VoidEventPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -8,8 +9,6 @@ import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -22,7 +21,7 @@ import java.util.UUID;
 
 /**
  * Maneja la habilidad "Impulso Ascendente" de las Alas de la Luz.
- * Doble salto en el suelo → impulso tipo carga de viento + inicio de planeo.
+ * Shift + Espacio en el suelo → impulso tipo carga de viento + inicio de planeo.
  */
 public class ElytraAbilityListener implements Listener {
 
@@ -43,30 +42,17 @@ public class ElytraAbilityListener implements Listener {
         return meta.getPersistentDataContainer().has(elytraKey, PersistentDataType.BOOLEAN);
     }
 
+    /**
+     * Detecta salto (Shift + Espacio mientras agachado en el suelo).
+     * PlayerJumpEvent de Paper fira fiablemente incluso agachado,
+     * a diferencia de PlayerToggleFlightEvent que Minecraft bloquea con Shift.
+     */
     @EventHandler
-    public void onMove(PlayerMoveEvent e) {
+    public void onJump(PlayerJumpEvent e) {
         Player p = e.getPlayer();
         if (p.getGameMode() == GameMode.CREATIVE || p.getGameMode() == GameMode.SPECTATOR) return;
         if (!hasSpecialElytra(p)) return;
-
-        if (p.isOnGround() && !p.isFlying()) {
-            p.setAllowFlight(true);
-        }
-    }
-
-    @EventHandler
-    public void onToggleFlight(PlayerToggleFlightEvent e) {
-        Player p = e.getPlayer();
-        if (p.getGameMode() == GameMode.CREATIVE || p.getGameMode() == GameMode.SPECTATOR) return;
-        if (!hasSpecialElytra(p)) return;
-
-        // SIEMPRE cancelar el vuelo — nunca dejar volar
-        e.setCancelled(true);
-        p.setAllowFlight(false);
-        p.setFlying(false);
-
-        // Solo impulsar desde el suelo
-        if (!p.isOnGround()) return;
+        if (!p.isSneaking()) return; // Solo Shift + Espacio
         if (cooldown.contains(p.getUniqueId())) return;
 
         // Cooldown de 4 segundos
